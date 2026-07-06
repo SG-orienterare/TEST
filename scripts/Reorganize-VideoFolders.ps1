@@ -138,9 +138,9 @@ Write-Log "DryRun: $DryRun"
 Write-Log ""
 
 # Hitta alla undermappar som matchar datumformatet
-$sourceFolders = Get-ChildItem -LiteralPath $SourcePath -Directory | Where-Object {
+$sourceFolders = @(Get-ChildItem -LiteralPath $SourcePath -Directory | Where-Object {
     $null -ne (Get-DateFromFolderName -FolderName $_.Name)
-}
+})
 
 Write-Log "Hittade $($sourceFolders.Count) mappar att bearbeta." Green
 
@@ -152,9 +152,9 @@ foreach ($folder in $sourceFolders) {
     $targetFolderPath = Join-Path $DestinationPath $targetFolderName
 
     # Hitta videofiler i mappen (inte i undermappar)
-    $videoFiles = Get-ChildItem -LiteralPath $folder.FullName -File | Where-Object {
+    $videoFiles = @(Get-ChildItem -LiteralPath $folder.FullName -File | Where-Object {
         $VideoExtensions -contains $_.Extension.ToLower()
-    }
+    })
 
     if ($videoFiles.Count -eq 0) {
         Write-Log "  HOPPAR ÖVER (ingen video): $($folder.Name)" Yellow
@@ -192,7 +192,7 @@ foreach ($folder in $sourceFolders) {
     }
 
     # Ta bort tom källmapp
-    $remaining = Get-ChildItem -LiteralPath $folder.FullName -Force -ErrorAction SilentlyContinue
+    $remaining = @(Get-ChildItem -LiteralPath $folder.FullName -Force -ErrorAction SilentlyContinue)
     if ($remaining.Count -eq 0) {
         if ($DryRun) {
             Write-Log "  SKULLE TA BORT TOM MAPP: $($folder.Name)" DarkGray

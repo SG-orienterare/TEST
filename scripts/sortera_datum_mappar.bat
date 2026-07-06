@@ -1,15 +1,14 @@
 @echo off
-chcp 65001 >nul
 setlocal
 
-REM Sorterar Duplicate Cleaner-mappar till YYYY_MM_DD (t.ex. 2025_08_11)
-REM Kör fran samma mapp som bat-filen ligger i.
+:: Sorterar Duplicate Cleaner-mappar till YYYY_MM_DD (t.ex. 2025_08_11)
+:: Kor fran samma mapp som bat-filen ligger i.
 
 set "MAPP=%~dp0"
 set "MAPP=%MAPP:~0,-1%"
 
-if /I "%~1"=="KOR" goto :run
-if /I "%~1"=="RUN" goto :run
+if /I "%~1"=="KOR" goto run
+if /I "%~1"=="RUN" goto run
 
 echo.
 echo === TORRKORNING (inget flyttas) ===
