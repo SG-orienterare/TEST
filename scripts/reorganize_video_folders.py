@@ -6,7 +6,7 @@ Duplicate Cleaner skapar en mapp per film med namn som:
   "7_5_2013 9_08_38 AM"  (månad_dag_år timme_minut_sekund AM/PM)
 
 Skriptet flyttar alla filer till mappar med formatet:
-  "2013-07-05"
+  "2013_07_05"
 Alla filer från samma dag hamnar i samma mapp.
 """
 
@@ -65,7 +65,7 @@ def unique_dest_path(directory: Path, filename: str) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Gruppera Duplicate Cleaner-videomappar efter datum (YYYY-MM-DD)."
+        description="Gruppera Duplicate Cleaner-videomappar efter datum (YYYY_MM_DD)."
     )
     parser.add_argument("source", type=Path, help="Rotmapp med Duplicate Cleaner-mappar")
     parser.add_argument(
@@ -102,7 +102,7 @@ def main() -> int:
     for folder in sorted(folders):
         dt = parse_folder_name(folder.name)
         assert dt is not None
-        target_name = dt.strftime("%Y-%m-%d")
+        target_name = dt.strftime("%Y_%m_%d")
         target_dir = destination / target_name
 
         videos = [

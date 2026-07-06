@@ -9,7 +9,7 @@
     (månad_dag_år timme_minut_sekund AM/PM)
 
     Skriptet flyttar alla filer till mappar med formatet:
-      "2013-07-05"
+      "2013_07_05"
     Alla filer från samma dag hamnar i samma mapp.
 
 .PARAMETER SourcePath
@@ -148,7 +148,7 @@ foreach ($folder in $sourceFolders) {
     $stats.FoldersScanned++
 
     $date = Get-DateFromFolderName -FolderName $folder.Name
-    $targetFolderName = $date.ToString('yyyy-MM-dd')
+    $targetFolderName = $date.ToString('yyyy_MM_dd')
     $targetFolderPath = Join-Path $DestinationPath $targetFolderName
 
     # Hitta videofiler i mappen (inte i undermappar)
