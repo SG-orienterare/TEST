@@ -1,54 +1,19 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Grupperar videomappar från Duplicate Cleaner Pro 5 efter datum.
-
-.DESCRIPTION
-    Duplicate Cleaner skapar en mapp per film med namn som:
-      "7_5_2013 9_08_38 AM"
-    (månad_dag_år timme_minut_sekund AM/PM)
-
-    Skriptet flyttar alla filer till mappar med formatet:
-      "2013_07_05"
-    Alla filer från samma dag hamnar i samma mapp.
-
-.PARAMETER SourcePath
-    Rotmappen som innehåller alla Duplicate Cleaner-mappar.
-
-.PARAMETER DestinationPath
-    Vart de nya datummapparna ska skapas. Standard: samma som SourcePath.
-
-.PARAMETER DryRun
-    Visar vad som skulle göras utan att flytta något.
-
-.PARAMETER VideoExtensions
-    Filändelser som räknas som video. Standard: vanliga format.
-
-.EXAMPLE
-    .\Reorganize-VideoFolders.ps1 -SourcePath "D:\Videos\DuplicateCleaner" -DryRun
-
-.EXAMPLE
-    .\Reorganize-VideoFolders.ps1 -SourcePath "D:\Videos\DuplicateCleaner"
-#>
-[CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [Parameter(Mandatory = $true)]
     [string]$SourcePath,
 
     [string]$DestinationPath = "",
 
-    [switch]$DryRun,
-
-    [string[]]$VideoExtensions = @('.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.mpg', '.mpeg', '.3gp', '.mts', '.m2ts')
+    [switch]$DryRun
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ScriptVersion = '1.3'
 
 function Get-DateFromFolderName {
     param([string]$FolderName)
 
-    # Format: M_D_YYYY H_M_S AM/PM  (t.ex. "7_5_2013 9_08_38 AM")
     if ($FolderName -notmatch '^(\d+)_(\d+)_(\d+)\s+(\d+)_(\d+)_(\d+)\s+(AM|PM)$') {
         return $null
     }
@@ -65,8 +30,7 @@ function Get-DateFromFolderName {
     if ($ampm -eq 'AM' -and $hour -eq 12) { $hour = 0 }
 
     try {
-        $dt = Get-Date -Year $year -Month $month -Day $day -Hour $hour -Minute $minute -Second $second
-        return $dt
+        return Get-Date -Year $year -Month $month -Day $day -Hour $hour -Minute $minute -Second $second
     }
     catch {
         return $null
@@ -74,18 +38,13 @@ function Get-DateFromFolderName {
 }
 
 function Get-UniqueFilePath {
-    param(
-        [string]$Directory,
-        [string]$FileName
-    )
+    param([string]$Directory, [string]$FileName)
 
     $base   = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
     $ext    = [System.IO.Path]::GetExtension($FileName)
     $target = Join-Path $Directory $FileName
 
-    if (-not (Test-Path -LiteralPath $target)) {
-        return $target
-    }
+    if (-not (Test-Path -LiteralPath $target)) { return $target }
 
     $counter = 1
     do {
@@ -96,48 +55,33 @@ function Get-UniqueFilePath {
     return $candidate
 }
 
-# --- Validering ---
+function Write-Log {
+    param([string]$Message, [string]$Color = 'White')
+    Write-Host ("[{0:yyyy-MM-dd HH:mm:ss}] {1}" -f (Get-Date), $Message) -ForegroundColor $Color
+}
+
 $SourcePath = (Resolve-Path -LiteralPath $SourcePath).Path
 if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
     $DestinationPath = $SourcePath
 }
-else {
-    if (-not (Test-Path -LiteralPath $DestinationPath)) {
-        if ($DryRun) {
-            Write-Host "Skapar destinationsmapp: $DestinationPath" -ForegroundColor Yellow
-        }
-        else {
-            New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
-        }
+elseif (-not (Test-Path -LiteralPath $DestinationPath)) {
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
     }
     $DestinationPath = (Resolve-Path -LiteralPath $DestinationPath).Path
 }
-
-$logPath = Join-Path $DestinationPath ("reorganize-log_{0:yyyyMMdd_HHmmss}.txt" -f (Get-Date))
-$stats = @{
-    FoldersScanned = 0
-    FilesMoved     = 0
-    FoldersRemoved = 0
-    Skipped        = 0
-    Errors         = 0
+else {
+    $DestinationPath = (Resolve-Path -LiteralPath $DestinationPath).Path
 }
 
-function Write-Log {
-    param([string]$Message, [string]$Color = 'White')
-    $line = "[{0:yyyy-MM-dd HH:mm:ss}] {1}" -f (Get-Date), $Message
-    Write-Host $line -ForegroundColor $Color
-    if (-not $DryRun) {
-        Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
-    }
-}
+$stats = @{ Scanned = 0; Moved = 0; Removed = 0; Skipped = 0; Errors = 0 }
 
-Write-Log "=== Reorganize Video Folders ===" Cyan
-Write-Log "Källa: $SourcePath"
+Write-Log "=== Reorganize Video Folders v$ScriptVersion ===" Cyan
+Write-Log "Kalla: $SourcePath"
 Write-Log "Destination: $DestinationPath"
 Write-Log "DryRun: $DryRun"
 Write-Log ""
 
-# Hitta alla undermappar som matchar datumformatet
 $sourceFolders = @(Get-ChildItem -LiteralPath $SourcePath -Directory | Where-Object {
     $null -ne (Get-DateFromFolderName -FolderName $_.Name)
 })
@@ -145,24 +89,22 @@ $sourceFolders = @(Get-ChildItem -LiteralPath $SourcePath -Directory | Where-Obj
 Write-Log "Hittade $($sourceFolders.Count) mappar att bearbeta." Green
 
 foreach ($folder in $sourceFolders) {
-    $stats.FoldersScanned++
+    $stats.Scanned++
 
     $date = Get-DateFromFolderName -FolderName $folder.Name
     $targetFolderName = $date.ToString('yyyy_MM_dd')
     $targetFolderPath = Join-Path $DestinationPath $targetFolderName
 
-    # Hitta videofiler i mappen (inte i undermappar)
-    $videoFiles = @(Get-ChildItem -LiteralPath $folder.FullName -File | Where-Object {
-        $VideoExtensions -contains $_.Extension.ToLower()
-    })
+    # Flytta alla filer i mappen (inte bara video)
+    $files = @(Get-ChildItem -LiteralPath $folder.FullName -File -Force -ErrorAction SilentlyContinue)
 
-    if ($videoFiles.Count -eq 0) {
-        Write-Log "  HOPPAR ÖVER (ingen video): $($folder.Name)" Yellow
+    if ($files.Count -eq 0) {
+        Write-Log "  HOPPAR OVER (ingen fil): $($folder.Name)" Yellow
         $stats.Skipped++
         continue
     }
 
-    foreach ($file in $videoFiles) {
+    foreach ($file in $files) {
         try {
             if (-not (Test-Path -LiteralPath $targetFolderPath)) {
                 if ($DryRun) {
@@ -183,15 +125,14 @@ foreach ($folder in $sourceFolders) {
                 Write-Log "  FLYTTAD: $($file.Name)  <-  $($folder.Name)  ->  $targetFolderName\" Green
             }
 
-            $stats.FilesMoved++
+            $stats.Moved++
         }
         catch {
-            Write-Log "  FEL vid flytt av $($file.FullName): $_" Red
+            Write-Log "  FEL: $($file.FullName) - $_" Red
             $stats.Errors++
         }
     }
 
-    # Ta bort tom källmapp
     $remaining = @(Get-ChildItem -LiteralPath $folder.FullName -Force -ErrorAction SilentlyContinue)
     if ($remaining.Count -eq 0) {
         if ($DryRun) {
@@ -199,24 +140,20 @@ foreach ($folder in $sourceFolders) {
         }
         else {
             Remove-Item -LiteralPath $folder.FullName -Force
-            Write-Log "  BORTTAGEN TOM MAPP: $($folder.Name)" DarkGray
         }
-        $stats.FoldersRemoved++
+        $stats.Removed++
     }
 }
 
 Write-Log ""
 Write-Log "=== SAMMANFATTNING ===" Cyan
-Write-Log "Mappar skannade:  $($stats.FoldersScanned)"
-Write-Log "Filer flyttade:   $($stats.FilesMoved)"
-Write-Log "Tomma mappar borta: $($stats.FoldersRemoved)"
-Write-Log "Hoppade över:     $($stats.Skipped)"
-Write-Log "Fel:              $($stats.Errors)"
+Write-Log "Mappar skannade:    $($stats.Scanned)"
+Write-Log "Filer flyttade:     $($stats.Moved)"
+Write-Log "Tomma mappar borta: $($stats.Removed)"
+Write-Log "Hoppade over:       $($stats.Skipped)"
+Write-Log "Fel:                $($stats.Errors)"
 
 if ($DryRun) {
     Write-Log ""
-    Write-Log "Detta var en torrkörning. Kör utan -DryRun för att utföra ändringarna." Yellow
-}
-elseif ($stats.FilesMoved -gt 0) {
-    Write-Log "Logg sparad: $logPath" Green
+    Write-Log "Torrkorning klar. Kor: sortera_datum_mappar.bat KOR" Yellow
 }
